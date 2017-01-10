@@ -1,0 +1,9 @@
+Django==1.10.4
+djangorestframework==3.5.3
+psycopg2==2.6.1
+wheel==0.24.0
+gunicorn==19.6.0
+coreapi==2.1.1
+itypes==1.1.0
+requests==2.12.4
+uritemplate==3.0.0

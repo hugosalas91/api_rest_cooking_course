@@ -1,0 +1,489 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1348\cocoasubrtf170
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;\f1\fmodern\fcharset0 Courier;\f2\fnil\fcharset0 Menlo-Regular;
+\f3\fnil\fcharset0 Menlo-Bold;\f4\froman\fcharset0 Times-Roman;}
+{\colortbl;\red255\green255\blue255;\red0\green61\blue204;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww10800\viewh8400\viewkind0
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
+
+\f0\fs24 \cf0 \
+
+\b\fs28 Despliegue Django con Docker machine y Docker compose\
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardeftab720\pardirnatural
+\cf0 \
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
+
+\b0\fs24 \cf0 - Instalamos docker-compose y docker-machine en mi mac.\
+\
+- Comprobamos que docker machine est\'e1 instalado:\
+\pard\pardeftab720
+
+\f1 \cf0 \expnd0\expndtw0\kerning0
+$ docker-machine version\
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
+
+\f0 \cf0 \kerning1\expnd0\expndtw0 - Comprobamos que docker compose est\'e1 instalado:\
+\pard\pardeftab720
+
+\f1 \cf0 \expnd0\expndtw0\kerning0
+$ docker-compose version\
+\
+- Creamos una carpeta que contendr\'e1 el proyecto:\
+$ cd 
+\f2\fs22 \kerning1\expnd0\expndtw0 \CocoaLigature0 cd /Users/hugosalas91/Desktop\
+$ mkdir api-docker
+\f1\fs24 \expnd0\expndtw0\kerning0
+\CocoaLigature1 \
+\
+- Creamos una carpeta llamada web a la carpeta 
+\f2\fs22 \kerning1\expnd0\expndtw0 \CocoaLigature0 api-docker que acabamos de crear. El \'e1rbol de directorios quedar\'eda as\'ed:\
+\
+- Users\
+    |\
+    - hugosalas91\
+        |\
+        - Desktop\
+            |\
+            - api-docker\
+                |\
+                - web\
+                    |\
+                    manage.py\
+                    requirements.txt\
+                    course\
+                        |\
+                        \'85\
+                    cooking_course\
+                        |\
+                        settings.py\
+                        \'85\
+\
+- Creamos archivo llamado \'93Dockerfile\'94 en la carpeta /Users/hugosalas91/Desktop/api-docker/web:\
+\
+$ cd /Users/hugosalas91/Desktop/api-docker/web\
+$ touch Dockerfile\
+$ vim Dockerfile\
+\
+\pard\pardeftab720
+\cf2 FROM python:3.5-onbuild\
+\
+COPY docker-entrypoint.sh /tmp/docker-entrypoint.sh\
+RUN chmod +x /tmp/docker-entrypoint.sh\
+\
+ENTRYPOINT ["/tmp/docker-entrypoint.sh"]\
+\
+\pard\pardeftab720
+\cf0 - Creamos archivo llamado \'93docker-entrypoint.sh\'94 en la carpeta /Users/hugosalas91/Desktop/api-docker/web:\
+\
+$ cd /Users/hugosalas91/Desktop/api-docker/web\
+$ touch docker-entrypoint.sh\
+$ vim docker-entrypoint.sh\
+\
+\pard\pardeftab720
+\cf2 #!/bin/bash\
+\
+# Collect static files\
+echo "Collect static files"\
+python3 manage.py collectstatic --noinput\
+\
+# Create makemigrations\
+echo "Create makemigrations"\
+python3 manage.py makemigrations\
+\
+# Apply database migrations\
+echo "Apply database migrations"\
+python3 manage.py migrate\
+\
+# Start gunicorn\
+echo "Start gunicorn"\
+gunicorn cooking_course.wsgi:application -w 2 -b :8000\
+\
+\pard\pardeftab720
+\cf0 - Creamos carpeta nginx dentro de /Users/hugosalas91/Desktop/api-docker:\
+$ cd /Users/hugosalas91/Desktop/api-docker\
+$ mkdir nginx\
+\
+- Creamos archivo llamado \'93Dockerfile\'94 en la carpeta /Users/hugosalas91/Desktop/api-docker/nginx:\
+$ cd /Users/hugosalas91/Desktop/api-docker/nginx\cf2 \
+\cf0 $ touch Dockerfile\
+$ vim Dockerfile\cf2 \
+\cf0 \
+\pard\pardeftab720
+\cf2 FROM tutum/nginx\
+RUN rm /etc/nginx/sites-enabled/default\
+ADD sites-enabled/ /etc/nginx/sites-enabled\
+\
+\pard\pardeftab720
+\cf0 - Creamos carpeta sites-enabled dentro de /Users/hugosalas91/Desktop/api-docker/nginx:\
+$ cd /Users/hugosalas91/Desktop/api-docker/nginx\
+$ mkdir sites-enabled\cf2 \
+\cf0 \
+- Creamos archivo llamado \'93cooking_courses\'94 en la carpeta /Users/hugosalas91/Desktop/api-docker/nginx/sites-enabled:\
+$ cd /Users/hugosalas91/Desktop/api-docker/nginx/sites-enabled\cf2 \
+\cf0 $ touch cooking_courses\
+$ vim cooking_courses\
+\
+\pard\pardeftab720
+\cf2 server \{\
+\
+    listen 80;\
+    server_name api2.artiolabs.com;\
+    charset utf-8;\
+\
+    location /static \{\
+        alias /usr/src/app/static;\
+    \}\
+    \
+    location /media \{\
+        alias /usr/src/app/media;\
+    \}\
+\
+    location / \{\
+        proxy_pass http://web:8000;\
+        proxy_set_header Host $host;\
+        proxy_set_header X-Real-IP $remote_addr;\
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\
+    \}\
+\
+\}\
+\
+\pard\pardeftab720
+\cf0 - Creamos archivo llamado \'93.env\'94 en la carpeta /Users/hugosalas91/Desktop/api-docker:\cf2 \
+\cf0 $ cd /Users/hugosalas91/Desktop/api-docker\
+$ touch .env\
+$ vim .env\
+\
+\pard\pardeftab720
+\cf2 # Add Environment Variables\
+\
+\
+SECRET_KEY=seu09n9h*5gks*h9_5-13rmmqrqzor50ncy!wat71(9q-c#6gr\
+DB_NAME=postgres\
+DB_USER=postgres\
+DB_PASS=postgres\
+DB_SERVICE=postgres\
+DB_PORT=5432\
+\
+\pard\pardeftab720
+\cf0 Voy al archivo /Users/hugosalas91/Desktop/api-docker/web/cooking_course/settings.py y modifico lo siguiente:\
+\
+\pard\pardeftab720
+\cf2 \'85\
+DEBUG = os.getenv('DEBUG', 'NO').lower() in ('on', 'true', 'y', 'yes')\
+\'85\
+DATABASES = \{\
+    'default': \{\
+        'ENGINE': 'django.db.backends.postgresql_psycopg2', \
+        'NAME': os.environ['DB_NAME'],\
+        'USER': os.environ['DB_USER'],\
+        'PASSWORD': os.environ['DB_PASS'],\
+        'HOST': os.environ['DB_SERVICE'],\
+        'PORT': os.environ['DB_PORT']\
+    \}\
+\}\
+\'85\
+\
+\pard\pardeftab720
+\cf0 - Creamos archivo llamado \'93docker-compose.yml\'94 para desplegar un contenedor docker en local en la carpeta /Users/hugosalas91/Desktop/api-docker:\cf2 \
+\cf0 $ cd /Users/hugosalas91/Desktop/api-docker\
+$ touch docker-compose.yml\
+$ vim docker-compose.yml\
+\
+\pard\pardeftab720
+\cf2 web:\
+  restart: always\
+  build: ./web\
+  expose:\
+    - "8000"\
+  links:\
+    - postgres:postgres\
+  volumes:\
+    - /usr/src/app\
+    - /usr/src/app/static\
+    - /usr/src/app/media\
+  env_file: .env\
+  environment:\
+    DEBUG: 'true'\
+      \
+nginx:\
+  restart: always\
+  build: ./nginx/\
+  ports:\
+    - "80:80"\
+  volumes:\
+    - /www/static\
+    - /www/media/\
+  volumes_from:\
+    - web\
+  links:\
+    - web:web\
+    \
+postgres:\
+  restart: always\
+  image: postgres:latest\
+  ports:\
+    - "5432:5432"\
+  volumes:\
+    - pgdata:/var/lib/postgresql/data/\cf0 \
+\
+- Creamos archivo llamado \'93production.yml\'94 para desplegar un contenedor docker en el servidor en la carpeta /Users/hugosalas91/Desktop/api-docker:\cf2 \
+\pard\pardeftab720
+\cf0 $ cd /Users/hugosalas91/Desktop/api-docker\
+$ touch production.yml\
+$ vim production.yml\
+\
+\pard\pardeftab720
+\cf2 web:\
+  restart: always\
+  build: ./web\
+  expose:\
+    - "8000"\
+  links:\
+    - postgres:postgres\
+  volumes:\
+    - /usr/src/app/static\
+    - /usr/src/app/media\
+  env_file: .env\
+  \
+nginx:\
+  restart: always\
+  build: ./nginx/\
+  ports:\
+    - "80:80"\
+  volumes:\
+    - /www/static\
+  volumes_from:\
+    - web\
+  links:\
+    - web:web\
+    \
+postgres:\
+  restart: always\
+  image: postgres:latest\
+  ports:\
+    - "5432"\
+  volumes:\
+    - pgdata:/var/lib/postgresql/data/\
+\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural
+\cf0 - Creamos una m\'e1quina virtual docker:\
+\pard\pardeftab720
+
+\f1\fs24 \cf0 \expnd0\expndtw0\kerning0
+\CocoaLigature1 $ apt-get install virtualbox 
+\f2\fs22 \kerning1\expnd0\expndtw0 \CocoaLigature0 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural
+\cf0 $ docker-machine create -d virtualbox api-cooking-courses-dev;\
+\
+Para elegir con que m\'e1quina docker vamos a trabajar:\
+$ 
+\f1\fs24 \expnd0\expndtw0\kerning0
+\CocoaLigature1 eval $(docker-machine env 
+\f2\fs22 \kerning1\expnd0\expndtw0 \CocoaLigature0 api-cooking-courses-dev
+\f1\fs24 \expnd0\expndtw0\kerning0
+\CocoaLigature1 )\
+\
+Para listar las m\'e1quinas docker que tenemos disponibles:\
+$ docker-machine ls\
+\
+Poner los contenedores en ejecuci\'f3n, construir las im\'e1genes y empezar los servicios:\
+$ cd 
+\f2\fs22 \kerning1\expnd0\expndtw0 \CocoaLigature0 /Users/hugosalas91/Desktop/api-docker
+\f1\fs24 \expnd0\expndtw0\kerning0
+\CocoaLigature1 \
+\pard\pardeftab720
+\cf0 \expnd0\expndtw0\kerning0
+$ docker-compose build\
+$ docker-compose up -d\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural
+\cf0 \expnd0\expndtw0\kerning0
+\
+NOTA: Si no tuvi\'e9ramos la instrucci\'f3n de migrar la base de datos en el archivo 
+\f2\fs22 \kerning1\expnd0\expndtw0 \CocoaLigature0 /Users/hugosalas91/Desktop/api-docker/web/docker-entrypoint.sh lo har\'edamos de la siguiente manera:\
+\pard\pardeftab720
+
+\f1\fs24 \cf0 \expnd0\expndtw0\kerning0
+\CocoaLigature1 $ docker-compose run web /usr/local/bin/python manage.py migrate\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural
+\cf0 \expnd0\expndtw0\kerning0
+\
+Para guardar la ip de la m\'e1quina docker seleccionada en la que estamos trabajando:\
+$ docker-machine ip 
+\f2\fs22 \kerning1\expnd0\expndtw0 \CocoaLigature0 cooking-courses
+\f1\fs24 \expnd0\expndtw0\kerning0
+\CocoaLigature1 \
+\
+Ponemos la ip mostrada en nuestro navegador web y vemos la aplicaci\'f3n.\
+\
+Para ver los servicios que tenemos en ejecuci\'f3n:\
+\pard\pardeftab720
+\cf0 \expnd0\expndtw0\kerning0
+$ docker-compose ps\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural
+\cf0 \expnd0\expndtw0\kerning0
+\
+Para ver las variables de entorno disponibles:\
+\pard\pardeftab720
+\cf0 \expnd0\expndtw0\kerning0
+$ docker-compose run web env\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural
+\cf0 \expnd0\expndtw0\kerning0
+\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural
+
+\f2\fs22 \cf0 \kerning1\expnd0\expndtw0 \CocoaLigature0 Para ver los logs:\
+$ 
+\f1\fs24 \expnd0\expndtw0\kerning0
+\CocoaLigature1 docker-compose logs\
+
+\f2\fs22 \kerning1\expnd0\expndtw0 \CocoaLigature0 \
+Para entrar al shell de postgresql:\
+\pard\pardeftab720
+
+\f1\fs24 \cf0 \expnd0\expndtw0\kerning0
+\CocoaLigature1 $ psql -h 192.168.99.100 -p 5432 -U postgres --password\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural
+
+\f2\fs22 \cf0 \kerning1\expnd0\expndtw0 \CocoaLigature0 \
+Ya tenemos el docker de desarrollo listo y funcionando, antes de crear la m\'e1quina docker en el servidor real vamos a parar la m\'e1quina docker para desarrollo:\
+\pard\pardeftab720
+
+\f1\fs24 \cf0 \expnd0\expndtw0\kerning0
+\CocoaLigature1 $ docker-compose stop
+\f2\fs22 \kerning1\expnd0\expndtw0 \CocoaLigature0 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural
+\cf0 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural
+
+\f3\b\fs28 \cf0 docker en producci\'f3n\
+\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural
+
+\f1\b0\fs24 \cf0 \expnd0\expndtw0\kerning0
+\CocoaLigature1 Crea un access token en digital ocean de la siguiente manera:\
+\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural
+
+\f2\fs22 \cf0 \kerning1\expnd0\expndtw0 \CocoaLigature0 - Logueate en el panel de control de digital ocean.\
+- En el men\'fa de arriba hacer click en \'93API\'94.\
+- En la secci\'f3n \'93Personal Access Tokens\'94 hacer click en \'93Generate new token\'94.\
+- Ir\'e1s a la pantalla \'93New Personal Access Token\'94 donde escribir\'e1s un nombre para el token y dejar\'e1s seleccionados los checkbos \'93Read (Default)\'94 y \'93Write (Optional)\'94, y har\'e1s click en el bot\'f3n \'93Generate Token\'94.\
+- Tu token ser\'e1 generado y se te presentar\'e1 una cadena de caracteres en tu p\'e1gina \'93Personal Access Tokens\'94, en nuestro caso fue:\
+\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural
+
+\f4\fs24 \cf0 \expnd0\expndtw0\kerning0
+\CocoaLigature1 8786c27e704b0305e2f06e195872d7501b07dc0b48eeabe902a50e372d43d1a5\
+\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural
+
+\f2\fs22 \cf0 \kerning1\expnd0\expndtw0 \CocoaLigature0 Guarda esta cadena de caracteres porque la necesitar\'e1s para acceder siempre por token al servidor.\
+\
+Para mantener el token guardado en nuestro ordenador y no tener que meterlo todas las veces ve al archivo ~/.bash_profile y a\'f1ade lo siguiente:\
+\
+# ACCESS TOKEN DIGITAL OCEAN\
+export TOKEN=8786c27e704b0305e2f06e195872d7501b07dc0b48eeabe902a50e372d43d1a5\
+\
+Despu\'e9s de generar el token de Digital Ocean vamos a crear una m\'e1quina Docker que se ejecute en el servidor de Digital Ocean:\
+\pard\pardeftab720
+
+\f1\fs24 \cf0 \expnd0\expndtw0\kerning0
+\CocoaLigature1 $ docker-machine create -d digitalocean --digitalocean-access-token=
+\f2\fs22 \kerning1\expnd0\expndtw0 \CocoaLigature0 8786c27e704b0305e2f06e195872d7501b07dc0b48eeabe902a50e372d43d1a5
+\f1\fs24 \expnd0\expndtw0\kerning0
+\CocoaLigature1  production\
+\
+Ahora tenemos dos m\'e1quina Docker corriendo, una localmente y otra en Digital Ocean, para ver las m\'e1quinas escribir:\
+$ docker-machine ls\
+\
+Activa la m\'e1quina docker production para cargar el entorno de esa m\'e1quina Docker en el shell:\
+$ eval "$(docker-machine env 
+\f2\fs22 \kerning1\expnd0\expndtw0 \CocoaLigature0 api-cooking-courses-
+\f1\fs24 \expnd0\expndtw0\kerning0
+\CocoaLigature1 production)"\
+\
+Finalmente vamos a construir la Django app en la nube. Esta vez necesitamos utilizar un ligeramente diferente archivo Docker Compose que no monte el volumen 
+\f2\fs22 \cf2 \kerning1\expnd0\expndtw0 \CocoaLigature0 /usr/src/app 
+\f1\fs24 \cf0 \expnd0\expndtw0\kerning0
+\CocoaLigature1 en el contenedor. \'bfPor qu\'e9? Bien, el volumen es perfecto para despliegue local ya que nosotros podemos actualizar nuestro c\'f3digo en el directorio \'93web\'94 y los cambios tomar\'e1n efecto inmediatamente en el contenedor. En producci\'f3n, esto no es necesario, por eso ahora utilizamos el archivo de docker-compose 
+\f2\fs22 \kerning1\expnd0\expndtw0 \CocoaLigature0 production.yml:\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural
+
+\f1\fs24 \cf0 \expnd0\expndtw0\kerning0
+\CocoaLigature1 $ cd 
+\f2\fs22 \kerning1\expnd0\expndtw0 \CocoaLigature0 /Users/hugosalas91/Desktop/api-docker\
+\pard\pardeftab720
+
+\f1\fs24 \cf0 \expnd0\expndtw0\kerning0
+\CocoaLigature1 $ docker-compose build\
+$ docker-compose -f production.yml up -d\
+\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural
+\cf0 \expnd0\expndtw0\kerning0
+NOTA: Si no tuvi\'e9ramos la instrucci\'f3n de migrar la base de datos en el archivo 
+\f2\fs22 \kerning1\expnd0\expndtw0 \CocoaLigature0 /Users/hugosalas91/Desktop/api-docker/web/docker-entrypoint.sh lo har\'edamos de la siguiente manera:\
+\pard\pardeftab720
+
+\f1\fs24 \cf0 \expnd0\expndtw0\kerning0
+\CocoaLigature1 $ docker-compose run web /usr/local/bin/python manage.py migrate\
+\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural
+\cf0 \expnd0\expndtw0\kerning0
+Para guardar la ip de la m\'e1quina docker seleccionada en la que estamos trabajando:\
+$ 
+\f2\fs22 \kerning1\expnd0\expndtw0 \CocoaLigature0 docker-machine ip api-cooking-courses-production
+\f1\fs24 \expnd0\expndtw0\kerning0
+\CocoaLigature1 \
+Y da como resultado la ip: 
+\f2\fs22 \kerning1\expnd0\expndtw0 \CocoaLigature0 104.236.9.188
+\f1\fs24 \expnd0\expndtw0\kerning0
+\CocoaLigature1 \
+\pard\pardeftab720
+\cf0 \expnd0\expndtw0\kerning0
+\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural
+
+\f2\fs22 \cf0 \kerning1\expnd0\expndtw0 \CocoaLigature0 S\'f3lo nos queda configurar el archivo nginx del servidor para enlazar el dominio api2.artiolabs.com a la nueva m\'e1quina docker ejecut\'e1ndose en Digital Ocean. Para ello accedemos al servidor:\
+$ ssh root@138.68.76.34\
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
+
+\f4\fs24 \cf0 \expnd0\expndtw0\kerning0
+\CocoaLigature1 !2zI%!YB\
+\
+$ 
+\f2\fs22 \kerning1\expnd0\expndtw0 \CocoaLigature0 cd /etc/nginx/sites-available\
+$ touch api.artiolabs.com\
+$ vim api.artiolabs.com\
+\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural
+\cf2 upstream cooking_course_app_server \{\
+  server 104.236.9.188;\
+\}\
+\
+server \{\
+    listen   80;\
+    server_name api2.artiolabs.com;\
+\
+    location / \{\
+        proxy_pass         http://cooking_course_app_server;\
+        proxy_redirect     off;\
+        proxy_set_header   Host $host;\
+        proxy_set_header   X-Real-IP $remote_addr;\
+        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;\
+        proxy_set_header   X-Forwarded-Host $server_name;\
+    \}\
+\}\cf0 \
+\
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
+\cf0 $ cd ../sites-enabled\
+$ ln -s ../sites-available/api.artiolabs.com\
+$ service nginx restart\
+\
+\
+
+\f4\fs24 \expnd0\expndtw0\kerning0
+\CocoaLigature1 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural
+
+\f2\fs22 \cf0 \kerning1\expnd0\expndtw0 \CocoaLigature0 \
+\
+}
